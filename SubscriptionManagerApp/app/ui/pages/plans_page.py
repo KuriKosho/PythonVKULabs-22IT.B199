@@ -1,12 +1,19 @@
-from PyQt6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QPushButton,
-                             QTableWidget, QTableWidgetItem, QHeaderView,
-                             QDialog, QFormLayout, QLineEdit, QSpinBox, QDoubleSpinBox, QMessageBox, QLabel)
+from PyQt6.QtWidgets import (
+    QWidget, QVBoxLayout, QHBoxLayout, QPushButton,
+    QTableWidget, QTableWidgetItem, QHeaderView,
+    QDialog, QFormLayout, QLineEdit, QSpinBox,
+    QDoubleSpinBox, QMessageBox, QLabel
+)
 from PyQt6.QtCore import Qt
+
 from SubscriptionManagerApp.app.data.plan_dao import PlanDAO
 from SubscriptionManagerApp.app.utils.helpers import format_currency
 from SubscriptionManagerApp.app.utils.section import Session
 
 
+# =====================================================
+# PLAN DIALOG (ADD / EDIT)
+# =====================================================
 class PlanDialog(QDialog):
     def __init__(self, parent=None, plan=None):
         super().__init__(parent)
@@ -39,7 +46,7 @@ class PlanDialog(QDialog):
         btn_save.clicked.connect(self.accept)
         layout.addWidget(btn_save)
 
-        # Nếu là EDIT → đổ dữ liệu
+        # EDIT MODE
         if self.plan:
             self.inp_name.setText(self.plan["name"])
             self.inp_duration.setValue(self.plan["duration_months"])
@@ -55,7 +62,9 @@ class PlanDialog(QDialog):
         }
 
 
-
+# =====================================================
+# PLANS PAGE
+# =====================================================
 class PlansPage(QWidget):
     def __init__(self):
         super().__init__()
@@ -70,20 +79,66 @@ class PlansPage(QWidget):
         self.init_ui()
         self.load_data()
 
+    # =================================================
     def init_ui(self):
         layout = QVBoxLayout(self)
 
-        # Header
+        # ===== HEADER =====
         top = QHBoxLayout()
-        top.addWidget(QLabel("QUẢN LÝ CÁC GÓI DỊCH VỤ", styleSheet="font-weight:bold; font-size:16px;"))
+
+        lbl = QLabel("QUẢN LÝ CÁC GÓI DỊCH VỤ")
+        lbl.setStyleSheet("font-weight:bold; font-size:16px;")
+
         btn_add = QPushButton("+ Thêm Gói Mới")
         btn_add.setStyleSheet("background-color:#27ae60;color:white;padding:8px;")
         btn_add.setCursor(Qt.CursorShape.PointingHandCursor)
         btn_add.clicked.connect(lambda: self.open_edit_dialog())
+
+        top.addWidget(lbl)
+        top.addStretch()
         top.addWidget(btn_add)
         layout.addLayout(top)
 
-        # Table
+        # ===== SEARCH BAR =====
+        search_bar = QHBoxLayout()
+
+        self.inp_search = QLineEdit()
+        self.inp_search.setPlaceholderText("🔍 Tìm theo tên gói hoặc mô tả...")
+        self.inp_search.textChanged.connect(self.apply_filter)
+
+        search_bar.addWidget(QLabel("Tìm kiếm:"))
+        search_bar.addWidget(self.inp_search)
+
+        layout.addLayout(search_bar)
+        # ===== FILTER BAR =====
+        filter_bar = QHBoxLayout()
+
+        self.min_price = QDoubleSpinBox()
+        self.min_price.setRange(0, 1_000_000_000)
+        self.min_price.setSingleStep(50000)
+        self.min_price.setPrefix("Từ ")
+
+        self.max_price = QDoubleSpinBox()
+        self.max_price.setRange(0, 1_000_000_000)
+        self.max_price.setSingleStep(50000)
+        self.max_price.setPrefix("Đến ")
+
+        btn_clear = QPushButton("Xoá lọc")
+        btn_clear.clicked.connect(self.clear_filters)
+
+        # Trigger filter when changed
+        self.min_price.valueChanged.connect(self.apply_filter)
+        self.max_price.valueChanged.connect(self.apply_filter)
+
+        filter_bar.addWidget(QLabel("Giá:"))
+        filter_bar.addWidget(self.min_price)
+        filter_bar.addWidget(self.max_price)
+        filter_bar.addStretch()
+        filter_bar.addWidget(btn_clear)
+
+        layout.addLayout(filter_bar)
+
+        # ===== TABLE =====
         self.table = QTableWidget()
         self.table.setColumnCount(6)
         self.table.setHorizontalHeaderLabels(
@@ -91,21 +146,33 @@ class PlansPage(QWidget):
         )
         self.table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
         self.table.setColumnHidden(0, True)
+        self.table.setSortingEnabled(True)
+
         layout.addWidget(self.table)
 
+    # =================================================
     def load_data(self):
+        self.table.setSortingEnabled(False)
         plans = self.dao.get_plans_by_user(self.user_id)
         self.table.setRowCount(0)
 
         for r, row in enumerate(plans):
             self.table.insertRow(r)
-            self.table.setItem(r, 0, QTableWidgetItem(str(row['id'])))
-            self.table.setItem(r, 1, QTableWidgetItem(row['name']))
-            self.table.setItem(r, 2, QTableWidgetItem(f"{row['duration_months']} Tháng"))
-            self.table.setItem(r, 3, QTableWidgetItem(format_currency(row['price'])))
-            self.table.setItem(r, 4, QTableWidgetItem(row['description'] or ""))
 
-            # --- ACTION BUTTONS ---
+            self.table.setItem(r, 0, QTableWidgetItem(str(row["id"])))
+            self.table.setItem(r, 1, QTableWidgetItem(row["name"]))
+
+            duration_item = QTableWidgetItem(f"{row['duration_months']} Tháng")
+            duration_item.setData(Qt.ItemDataRole.UserRole, row["duration_months"])
+            self.table.setItem(r, 2, duration_item)
+
+            price_item = QTableWidgetItem(format_currency(row["price"]))
+            price_item.setData(Qt.ItemDataRole.UserRole, row["price"])
+            self.table.setItem(r, 3, price_item)
+
+            self.table.setItem(r, 4, QTableWidgetItem(row["description"] or ""))
+
+            # ===== ACTION BUTTONS =====
             btn_edit = QPushButton("✏️")
             btn_delete = QPushButton("🗑️")
 
@@ -119,8 +186,39 @@ class PlansPage(QWidget):
 
             action_widget = QWidget()
             action_widget.setLayout(action_layout)
-
             self.table.setCellWidget(r, 5, action_widget)
+
+        self.table.setSortingEnabled(True)
+        self.apply_filter()
+
+    # =================================================
+    def apply_filter(self):
+        keyword = self.inp_search.text().lower()
+        min_price = self.min_price.value()
+        max_price = self.max_price.value()
+
+        for row in range(self.table.rowCount()):
+            name = self.table.item(row, 1).text().lower()
+            desc = self.table.item(row, 4).text().lower()
+
+            price_item = self.table.item(row, 3)
+            price = price_item.data(Qt.ItemDataRole.UserRole)
+
+            match_text = keyword in name or keyword in desc
+            match_min = price >= min_price
+            match_max = (max_price == 0 or price <= max_price)
+
+            visible = match_text and match_min and match_max
+            self.table.setRowHidden(row, not visible)
+
+    # =================================================
+
+    def clear_filters(self):
+        self.inp_search.clear()
+        self.min_price.setValue(0)
+        self.max_price.setValue(0)
+        self.apply_filter()
+
 
     def open_edit_dialog(self, plan=None):
         dialog = PlanDialog(self, plan)
@@ -133,7 +231,6 @@ class PlansPage(QWidget):
                 return
 
             if plan is None:
-                # 👉 ADD NEW
                 self.dao.add_plan(
                     self.user_id,
                     data["name"],
@@ -143,7 +240,6 @@ class PlansPage(QWidget):
                 )
                 QMessageBox.information(self, "OK", "Đã thêm gói mới!")
             else:
-                # 👉 UPDATE
                 self.dao.update_plan(
                     plan["id"],
                     self.user_id,
@@ -156,6 +252,7 @@ class PlansPage(QWidget):
 
             self.load_data()
 
+    # =================================================
     def confirm_delete(self, plan_id):
         reply = QMessageBox.question(
             self,
@@ -168,4 +265,3 @@ class PlansPage(QWidget):
             self.dao.delete_plan(plan_id, self.user_id)
             self.load_data()
             QMessageBox.information(self, "OK", "Đã xoá gói!")
-
