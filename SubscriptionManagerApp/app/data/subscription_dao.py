@@ -105,3 +105,20 @@ class SubscriptionDAO:
 
         conn.close()
         return stats
+
+    def update_subscription(self, sub_id, user_id, member_id, plan_id, price, start_date, end_date, note):
+        conn = db.connect()
+        cursor = conn.cursor()
+        try:
+            cursor.execute("""
+                UPDATE subscriptions
+                SET member_id = ?, plan_id = ?, price = ?, start_date = ?, end_date = ?, note = ?
+                WHERE id = ? AND user_id = ?
+            """, (member_id, plan_id, price, start_date, end_date, note, sub_id, user_id))
+            conn.commit()
+            return True
+        except Exception as e:
+            print("Update subscription error:", e)
+            return False
+        finally:
+            conn.close()
