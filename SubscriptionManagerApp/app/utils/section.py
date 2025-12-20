@@ -1,0 +1,22 @@
+class Session:
+    _current_user = None
+
+    @classmethod
+    def login(cls, user: dict):
+        """
+        Lưu thông tin user sau khi login
+        user = {"id": 1, "username": "admin", ...}
+        """
+        cls._current_user = user
+
+    @classmethod
+    def logout(cls):
+        cls._current_user = None
+
+    @classmethod
+    def get_user(cls):
+        return cls._current_user
+
+    @classmethod
+    def is_authenticated(cls) -> bool:
+        return cls._current_user is not None
