@@ -51,8 +51,8 @@ class NotificationService:
         """
 
         # 1. Lấy cấu hình SMTP theo USER
-        sender_email = self.settings_dao.get_setting(self.user_id, "smtp_email")
-        sender_password = self.settings_dao.get_setting(self.user_id, "smtp_password")
+        sender_email = self.settings_dao.get_settings_by_user(self.user_id, "smtp_email")
+        sender_password = self.settings_dao.get_settings_by_user(self.user_id, "smtp_password")
 
         if not sender_email or not sender_password:
             print("❌ Chưa cấu hình Email SMTP cho user:", self.user_id)

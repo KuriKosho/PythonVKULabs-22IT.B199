@@ -1,4 +1,5 @@
 from SubscriptionManagerApp.app.data.db_connection import db
+from SubscriptionManagerApp.app.utils.helpers import vector_to_blob
 from SubscriptionManagerApp.app.utils.security import verify_password, hash_password
 
 
@@ -128,4 +129,23 @@ class UserDAO:
             return False, str(e)
         finally:
             conn.close()
+
+    def update_user_face(self, user_id, avatar_path, face_vector):
+        conn = db.connect()
+        cursor = conn.cursor()
+
+        cursor.execute("""
+                       UPDATE users
+                       SET avatar_path = ?,
+                           face_vector = ?
+                       WHERE id = ?
+                       """, (
+                           avatar_path,
+                           vector_to_blob(face_vector),
+                           user_id
+                       ))
+
+        conn.commit()
+        conn.close()
+
 

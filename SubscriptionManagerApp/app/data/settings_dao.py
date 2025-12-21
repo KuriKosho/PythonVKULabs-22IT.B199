@@ -2,13 +2,15 @@ from SubscriptionManagerApp.app.data.db_connection import db
 
 
 class SettingsDAO:
-    def get_settings_by_user(self, user_id):
+    def get_settings_by_user(self, user_id, key=None):
         """Lấy settings theo user_id"""
         conn = db.connect()
         cursor = conn.cursor()
-
+        query = "SELECT * FROM system_settings WHERE user_id = ?"
+        if key:
+            query = f"SELECT {key} FROM system_settings WHERE user_id = ?"
         cursor.execute(
-            "SELECT * FROM system_settings WHERE user_id = ?",
+            query,
             (user_id,)
         )
         settings = cursor.fetchone()

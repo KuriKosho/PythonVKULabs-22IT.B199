@@ -21,31 +21,17 @@ class Database:
 
         # 1. Bảng Users (Quản trị viên)
         cursor.execute('''
-                       CREATE TABLE IF NOT EXISTS users
-                       (
-                           id
-                           INTEGER
-                           PRIMARY
-                           KEY
-                           AUTOINCREMENT,
-                           username
-                           TEXT
-                           UNIQUE
-                           NOT
-                           NULL,
-                           password_hash
-                           TEXT
-                           NOT
-                           NULL,
-                           role
-                           TEXT
-                           DEFAULT
-                           'admin',
-                           created_at
-                           TIMESTAMP
-                           DEFAULT
-                           CURRENT_TIMESTAMP
-                       )
+                       CREATE TABLE IF NOT EXISTS users (
+                            id INTEGER PRIMARY KEY AUTOINCREMENT,
+                            username TEXT UNIQUE NOT NULL,
+                            password_hash TEXT NOT NULL,
+                            role TEXT DEFAULT 'admin',
+                        
+                            avatar_path TEXT,         
+                            face_vector BLOB,          
+                        
+                            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                        );
                        ''')
 
         # 2. Bảng Members (Khách hàng)

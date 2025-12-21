@@ -1,14 +1,13 @@
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel,
-    QScrollArea, QListWidget, QPushButton, QMessageBox
+    QScrollArea, QListWidget, QPushButton, QMessageBox,
+    QFrame
 )
 from PyQt6.QtCore import Qt
 
-# Matplotlib cho PyQt
 from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.figure import Figure
 
-# DAO & Utils
 from SubscriptionManagerApp.app.data.subscription_dao import SubscriptionDAO
 from SubscriptionManagerApp.app.ui.components.custom_card import CustomCard
 from SubscriptionManagerApp.app.utils.helpers import format_currency
@@ -20,139 +19,130 @@ class DashboardPage(QWidget):
     def __init__(self):
         super().__init__()
 
-        # ===== USER SESSION =====
         self.user = Session.get_user()
         if not self.user:
             raise RuntimeError("DashboardPage loaded without authenticated user")
 
         self.user_id = self.user["id"]
-
-        # ===== SERVICES =====
         self.dao = SubscriptionDAO()
         self.notif_service = NotificationService(self.user_id)
 
         self.init_ui()
+        self.load_data()
 
     # =====================================================
     def init_ui(self):
         main_layout = QVBoxLayout(self)
+        main_layout.setContentsMargins(0, 0, 0, 0)
 
-        # Scroll (tránh vỡ layout màn hình nhỏ)
         scroll = QScrollArea()
         scroll.setWidgetResizable(True)
+        scroll.setStyleSheet("background:#f5f6fa;")
 
-        content_widget = QWidget()
-        self.layout = QVBoxLayout(content_widget)
+        content = QWidget()
+        self.layout = QVBoxLayout(content)
+        self.layout.setContentsMargins(20, 20, 20, 20)
+        self.layout.setSpacing(15)
 
-        # ===== TITLE =====
-        lbl_title = QLabel("DASHBOARD OVERVIEW")
-        lbl_title.setStyleSheet(
-            "font-size:20px;font-weight:bold;color:#2c3e50;margin-bottom:10px;"
-        )
+        # ===== HEADER =====
+        lbl_title = QLabel("Dashboard")
+        lbl_title.setStyleSheet("font-size:24px;font-weight:bold;color:#2c3e50;")
+
+        lbl_sub = QLabel("Tổng quan hệ thống quản lý gói")
+        lbl_sub.setStyleSheet("color:#7f8c8d;")
+
         self.layout.addWidget(lbl_title)
+        self.layout.addWidget(lbl_sub)
 
-        # ===== STATS CARDS =====
-        self.stats_container = QHBoxLayout()
-        self.layout.addLayout(self.stats_container)
+        # ===== CARDS =====
+        self.cards_layout = QHBoxLayout()
+        self.cards_layout.setSpacing(15)
+        self.layout.addLayout(self.cards_layout)
 
-        # ===== CHARTS =====
-        self.charts_container = QHBoxLayout()
-        self.layout.addLayout(self.charts_container)
+        # ===== MAIN CONTENT =====
+        body_layout = QHBoxLayout()
+        body_layout.setSpacing(15)
 
-        self.layout.addStretch()
-
-        scroll.setWidget(content_widget)
-        main_layout.addWidget(scroll)
-
-        # ===== NOTIFICATION AREA =====
-        lbl_notif = QLabel("🔔 Sắp hết hạn (3 ngày tới)")
-        lbl_notif.setStyleSheet(
-            "font-weight:bold;color:#e74c3c;margin-top:15px;"
+        # -------- LEFT: CHART AREA (70%) --------
+        chart_frame = QFrame()
+        chart_frame.setStyleSheet(
+            "background:white;border-radius:8px;padding:15px;"
         )
-        main_layout.addWidget(lbl_notif)
+        chart_layout = QVBoxLayout(chart_frame)
+        chart_layout.setSpacing(20)
+
+        lbl_chart = QLabel("📊 Thống kê tổng quan")
+        lbl_chart.setStyleSheet("font-weight:bold;font-size:16px;")
+        chart_layout.addWidget(lbl_chart)
+
+        charts_row = QHBoxLayout()
+        charts_row.setSpacing(20)
+
+        self.chart_left = QVBoxLayout()
+        self.chart_right = QVBoxLayout()
+
+        charts_row.addLayout(self.chart_left, 1)
+        charts_row.addLayout(self.chart_right, 1)
+
+        chart_layout.addLayout(charts_row)
+        body_layout.addWidget(chart_frame, 3)
+
+        # -------- RIGHT: SIDEBAR (30%) --------
+        sidebar = QFrame()
+        sidebar.setStyleSheet(
+            "background:white;border-radius:8px;padding:15px;"
+        )
+        sidebar_layout = QVBoxLayout(sidebar)
+        sidebar_layout.setSpacing(10)
+
+        lbl_notif = QLabel("🔔 Gói sắp hết hạn")
+        lbl_notif.setStyleSheet(
+            "font-weight:bold;font-size:15px;color:#e74c3c;"
+        )
 
         self.list_notif = QListWidget()
-        self.list_notif.setMaximumHeight(150)
-        main_layout.addWidget(self.list_notif)
+        self.list_notif.setMinimumHeight(250)
 
-        self.btn_send_mail = QPushButton("Gửi Email nhắc nhở")
+        self.btn_send_mail = QPushButton("📧 Gửi Email nhắc nhở")
         self.btn_send_mail.clicked.connect(self.handle_send_mail)
-        main_layout.addWidget(self.btn_send_mail)
 
-        self.load_data()
+        sidebar_layout.addWidget(lbl_notif)
+        sidebar_layout.addWidget(self.list_notif)
+        sidebar_layout.addWidget(self.btn_send_mail)
+
+        body_layout.addWidget(sidebar, 1)
+
+        self.layout.addLayout(body_layout)
+        self.layout.addStretch()
+
+        scroll.setWidget(content)
+        main_layout.addWidget(scroll)
 
     # =====================================================
     def load_data(self):
-        # Clear cũ
-        self.clear_layout(self.stats_container)
-        self.clear_layout(self.charts_container)
+        self.clear_layout(self.cards_layout)
+        self.clear_layout(self.chart_left)
+        self.clear_layout(self.chart_right)
 
-        # ===== LOAD STATS THEO USER =====
         stats = self.dao.get_dashboard_stats(self.user_id)
 
         # ===== CARDS =====
-        card_members = CustomCard(
-            "Tổng Thành Viên",
-            stats["total_members"],
-            color="#e67e22"
+        self.cards_layout.addWidget(
+            CustomCard("👥 Thành viên", stats["total_members"], "#8e44ad")
         )
-
-        card_active = CustomCard(
-            "Gói Đang Chạy",
-            stats["active_subs"],
-            color="#27ae60"
+        self.cards_layout.addWidget(
+            CustomCard("▶️ Gói hoạt động", stats["active_subs"], "#27ae60")
         )
-
-        card_revenue = CustomCard(
-            "Tổng Doanh Thu",
-            format_currency(stats["total_revenue"]),
-            color="#2980b9"
+        self.cards_layout.addWidget(
+            CustomCard("💰 Doanh thu", format_currency(stats["total_revenue"]), "#2980b9")
         )
+        self.cards_layout.addStretch()
 
-        self.stats_container.addWidget(card_members)
-        self.stats_container.addWidget(card_active)
-        self.stats_container.addWidget(card_revenue)
-        self.stats_container.addStretch()
+        # ===== CHARTS =====
+        self.chart_left.addWidget(self.create_pie_chart(stats["status_counts"]))
+        self.chart_right.addWidget(self.create_bar_chart(stats["status_counts"]))
 
-        # ===== PIE CHART =====
-        status_data = stats["status_counts"]
-
-        if status_data:
-            labels = []
-            sizes = []
-            colors = []
-
-            color_map = {
-                "Active": "#2ecc71",
-                "Overdue": "#e74c3c",
-                "Paused": "#f1c40f",
-                "Cancelled": "#95a5a6",
-            }
-
-            for row in status_data:
-                labels.append(f"{row['status']} ({row[1]})")
-                sizes.append(row[1])
-                colors.append(color_map.get(row["status"], "#34495e"))
-
-            fig = Figure(figsize=(5, 4), dpi=100)
-            fig.patch.set_facecolor("#ecf0f1")
-
-            ax = fig.add_subplot(111)
-            ax.pie(
-                sizes,
-                labels=labels,
-                colors=colors,
-                autopct="%1.1f%%",
-                startangle=90
-            )
-            ax.set_title("Tỷ lệ Trạng thái Gói")
-
-            canvas = FigureCanvas(fig)
-            self.charts_container.addWidget(canvas)
-        else:
-            self.charts_container.addWidget(QLabel("Chưa có dữ liệu thống kê."))
-
-        # ===== EXPIRING SOON =====
+        # ===== SIDEBAR =====
         self.list_notif.clear()
         self.expiring_subs = self.notif_service.get_expiring_soon(days=3)
 
@@ -162,11 +152,38 @@ class DashboardPage(QWidget):
         else:
             self.btn_send_mail.setEnabled(True)
             for sub in self.expiring_subs:
-                text = (
-                    f"{sub['full_name']} - {sub['plan_name']} "
-                    f"(Hết hạn: {sub['end_date']})"
+                self.list_notif.addItem(
+                    f"{sub['full_name']} - {sub['plan_name']}\nHết hạn: {sub['end_date']}"
                 )
-                self.list_notif.addItem(text)
+
+    # =====================================================
+    def create_pie_chart(self, data):
+        fig = Figure(figsize=(5, 4), dpi=100)
+        ax = fig.add_subplot(111)
+
+        if not data:
+            ax.text(0.5, 0.5, "Chưa có dữ liệu", ha="center", va="center")
+        else:
+            labels = [row["status"] for row in data]
+            values = [row[1] for row in data]
+            ax.pie(values, labels=labels, autopct="%1.1f%%", startangle=90)
+            ax.set_title("Tỷ lệ trạng thái gói")
+
+        return FigureCanvas(fig)
+
+    def create_bar_chart(self, data):
+        fig = Figure(figsize=(5, 4), dpi=100)
+        ax = fig.add_subplot(111)
+
+        if not data:
+            ax.text(0.5, 0.5, "Chưa có dữ liệu", ha="center", va="center")
+        else:
+            labels = [row["status"] for row in data]
+            values = [row[1] for row in data]
+            ax.bar(labels, values)
+            ax.set_title("Số lượng gói theo trạng thái")
+
+        return FigureCanvas(fig)
 
     # =====================================================
     def clear_layout(self, layout):
@@ -189,7 +206,5 @@ class DashboardPage(QWidget):
                     sent += 1
 
         QMessageBox.information(
-            self,
-            "Hoàn tất",
-            f"Đã gửi thành công {sent} email nhắc nhở."
+            self, "Hoàn tất", f"Đã gửi {sent} email nhắc nhở."
         )
