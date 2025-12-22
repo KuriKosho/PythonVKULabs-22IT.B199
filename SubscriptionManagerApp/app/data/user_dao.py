@@ -1,5 +1,4 @@
 from SubscriptionManagerApp.app.data.db_connection import db
-from SubscriptionManagerApp.app.utils.helpers import vector_to_blob
 from SubscriptionManagerApp.app.utils.security import verify_password, hash_password
 
 
@@ -141,7 +140,7 @@ class UserDAO:
                        WHERE id = ?
                        """, (
                            avatar_path,
-                           vector_to_blob(face_vector),
+                           face_vector,
                            user_id
                        ))
 

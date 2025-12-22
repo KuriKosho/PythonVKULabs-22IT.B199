@@ -49,27 +49,32 @@ class NotificationService:
         Gửi email nhắc nhở gia hạn
         Email gửi đi lấy từ system_settings của user
         """
+        row_email = self.settings_dao.get_settings_by_user(self.user_id, "smtp_email")
+        row_pass = self.settings_dao.get_settings_by_user(self.user_id, "smtp_password")
 
-        # 1. Lấy cấu hình SMTP theo USER
-        sender_email = self.settings_dao.get_settings_by_user(self.user_id, "smtp_email")
-        sender_password = self.settings_dao.get_settings_by_user(self.user_id, "smtp_password")
-
-        if not sender_email or not sender_password:
+        if not row_email or not row_pass:
             print("❌ Chưa cấu hình Email SMTP cho user:", self.user_id)
+            return False
+
+        try:
+            sender_email = row_email['value']
+            sender_password = row_pass['value']
+        except IndexError:
+            # Fallback: Nếu không lấy được theo tên cột, thử lấy theo index đầu tiên
+            sender_email = row_email[0]
+            sender_password = row_pass[0]
+        except Exception as e:
+            print(f"❌ Lỗi khi đọc dữ liệu từ Row: {e}")
             return False
 
         subject = f"Nhắc nhở gia hạn dịch vụ - {plan_name}"
         body = f"""
-Xin chào {member_name},
-
-Gói dịch vụ "{plan_name}" của bạn sẽ hết hạn vào ngày {end_date}.
-
-Vui lòng liên hệ để gia hạn nhằm tránh gián đoạn dịch vụ.
-
-Trân trọng,
-Subscription Manager App
-"""
-
+                Xin chào {member_name},
+                Gói dịch vụ "{plan_name}" của bạn sẽ hết hạn vào ngày {end_date}.
+                Vui lòng liên hệ để gia hạn nhằm tránh gián đoạn dịch vụ.
+                Trân trọng,
+                Subscription Manager App
+                """
         msg = MIMEText(body, "plain", "utf-8")
         msg["Subject"] = subject
         msg["From"] = sender_email
@@ -84,7 +89,7 @@ Subscription Manager App
             return True
 
         except smtplib.SMTPAuthenticationError:
-            print("❌ Sai Email hoặc App Password SMTP")
+            print("❌ Sai Email hoặc App Password SMTP. Hãy kiểm tra lại cấu hình.")
             return False
 
         except Exception as e:
